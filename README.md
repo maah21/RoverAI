@@ -1,149 +1,104 @@
 # RoverAI — Sistema Inteligente de Decisão Autônoma para Exploração Planetária
 
-Projeto desenvolvido para a GS 2026.1 da disciplina **Inteligência Artificial e Generative AI**.
+Projeto desenvolvido para a **Global Solution 2026.1** da disciplina *Inteligência Artificial e Generative AI* (FIAP). O trabalho propõe um protótipo de Inteligência Artificial para apoiar a tomada de decisão de um rover em uma missão de exploração planetária, a partir de dados simulados de sensores e telemetria.
 
-O objetivo do projeto é simular um sistema de Inteligência Artificial capaz de apoiar a tomada de decisão de um rover planetário a partir de dados simulados de sensores e telemetria.
+[Abrir notebook no Google Colab](https://colab.research.google.com/drive/1uAbLkDp5EJcKd7oxr4oHttG7jxqjEdU4?usp=sharing)
 
-## Contexto
+---
 
-Em uma missão de exploração planetária, um rover precisa operar em ambientes desconhecidos, com comunicação limitada e diferentes condições de risco. Para isso, o sistema deve interpretar informações como distância de obstáculos, inclinação do terreno, bateria, temperatura, vibração, luminosidade, poeira e qualidade do sinal de comunicação.
+## 1. Contexto e justificativa
 
-Com base nesses dados, o rover deve decidir automaticamente uma ação adequada, como seguir em frente, reduzir velocidade, desviar, parar, retornar à base ou entrar em modo seguro.
+Em uma missão de exploração planetária, o rover opera em ambiente desconhecido, sujeito a obstáculos, variações de terreno, risco de superaquecimento e instabilidade na comunicação com a Terra. Como o atraso e a perda de sinal inviabilizam o controle remoto contínuo, o veículo precisa decidir de forma autônoma.
 
-## Objetivo
+Este projeto modela esse problema como uma tarefa de **classificação supervisionada**: a partir das leituras dos sensores, o sistema deve selecionar a ação operacional mais adequada dentre sete categorias possíveis: `seguir_em_frente`, `reduzir_velocidade`, `desviar_direita`, `desviar_esquerda`, `parar`, `retornar_base` e `modo_seguro`.
 
-Desenvolver um protótipo em Python, no formato de notebook, que utilize técnicas de Inteligência Artificial para classificar a ação mais adequada do rover durante uma missão de exploração planetária.
+## 2. Objetivos
 
-O projeto compara dois modelos de classificação:
+O objetivo geral é desenvolver, em formato de notebook, um protótipo que aplique técnicas de IA à decisão autônoma do rover. Como objetivos específicos, o trabalho propõe-se a:
 
-- **Árvore de Decisão**
-- **Rede Neural Artificial MLP**
+- comparar o desempenho e a interpretabilidade de uma **Árvore de Decisão** e de uma **Rede Neural Artificial (MLP)** na classificação da ação;
+- estimar o consumo de energia do veículo por meio de **Regressão Linear**, como variável auxiliar de planejamento;
+- demonstrar, em caráter complementar, a aplicação de **Visão Computacional** (detecção de bordas) à percepção do terreno.
 
-Além disso, inclui uma etapa complementar de **Regressão Linear** para prever o consumo de energia do rover e uma etapa opcional de **Visão Computacional** para simular a detecção de bordas em um terreno planetário.
+## 3. Base de dados
 
-## Base de dados
+A base foi gerada sinteticamente em Python, conforme previsto no enunciado do desafio, e não deriva de fonte externa. Cada registro representa uma situação operacional da missão, com leituras de sensores geradas por faixas de valores coerentes com o domínio físico de cada ação (por exemplo, obstáculo muito próximo tende a resultar em `parar`; bateria muito baixa, em `retornar_base`). O conjunto possui **300 registros**, distribuídos entre as sete classes, superando o mínimo de 100 exigido.
 
-A base de dados foi criada de forma simulada com Python, seguindo as regras do desafio.
+### 3.1. Variáveis
 
-A base possui **300 registros**, em que cada linha representa uma situação operacional enfrentada pelo rover durante a missão.
+| Variável | Descrição | Unidade |
+|---|---|---|
+| `distancia_obstaculo_m` | Distância até o obstáculo mais próximo | metros |
+| `inclinacao_terreno_graus` | Inclinação do terreno | graus |
+| `bateria_percentual` | Nível de bateria do rover | % |
+| `temperatura_sistema_c` | Temperatura do sistema/motor | °C |
+| `vibracao_ms2` | Vibração percebida pelo rover | m/s² |
+| `sinal_comunicacao_percentual` | Qualidade do sinal de comunicação | % |
+| `luminosidade_lux` | Intensidade de luz do ambiente | lux |
+| `velocidade_atual_ms` | Velocidade atual do rover | m/s |
+| `poeira_percentual` | Estimativa de poeira no ambiente | % |
+| `tipo_terreno` | Tipo de terreno (plano, rochoso, arenoso, cratera) | categórica |
+| `consumo_energia_wh` | Consumo estimado de energia | Wh |
+| `acao_rover` | Variável-alvo da classificação | — |
 
-### Variáveis utilizadas
+A variável `tipo_terreno` é categórica e submetida a *One-Hot Encoding* antes do treinamento; a variável-alvo `acao_rover` é codificada com `LabelEncoder`. Para aproximar o cenário de falhas reais de sensores, foram inseridos valores ausentes de forma controlada, posteriormente tratados pela média da respectiva coluna.
 
-| Variável | Descrição |
-|---|---|
-| `distancia_obstaculo_m` | Distância entre o rover e o obstáculo mais próximo, em metros |
-| `inclinacao_terreno_graus` | Inclinação do terreno em graus |
-| `nivel_bateria_pct` | Nível de bateria do rover em porcentagem |
-| `temperatura_sistema_c` | Temperatura do sistema/motor em graus Celsius |
-| `vibracao_mm_s` | Nível de vibração do rover |
-| `sinal_comunicacao_pct` | Qualidade do sinal de comunicação com a base |
-| `luminosidade_lux` | Nível de luminosidade do ambiente |
-| `poeira_pct` | Intensidade de poeira no ambiente |
-| `velocidade_atual_ms` | Velocidade atual do rover em metros por segundo |
-| `terreno_codificado` | Representação numérica do tipo de terreno |
-| `consumo_energia_wh` | Consumo estimado de energia em Wh |
-| `acao_rover` | Ação esperada do rover, usada como variável-alvo dos modelos de classificação |
+## 4. Metodologia
 
-### Ações possíveis do rover
+O tratamento dos dados contempla a verificação e o preenchimento de valores ausentes, a codificação das variáveis categórica e alvo, e a divisão estratificada entre treino (75%) e teste (25%). Os modelos de classificação foram avaliados sobre o mesmo conjunto de teste, garantindo comparabilidade.
 
-- `seguir_em_frente`
-- `reduzir_velocidade`
-- `desviar_direita`
-- `desviar_esquerda`
-- `parar`
-- `retornar_base`
-- `modo_seguro`
+### 4.1. Árvore de Decisão
 
-A coluna `acao_rover` é a variável-alvo do projeto, ou seja, é aquilo que os modelos de IA tentam prever.
+Modelo de classificação baseado em regras hierárquicas (critério de Gini, profundidade máxima 8). Sua principal vantagem no contexto é a **interpretabilidade**: as regras podem ser visualizadas e auditadas, permitindo justificar cada decisão — atributo crítico em sistemas autônomos.
 
-## Modelos utilizados
+### 4.2. Rede Neural Artificial (MLP)
 
-### 1. Árvore de Decisão
+Modelo capaz de capturar relações não lineares entre as variáveis. Por ser sensível à escala, os dados foram padronizados com `StandardScaler` antes do treinamento. Em contrapartida à Árvore, apresenta menor transparência, uma vez que a decisão decorre de pesos distribuídos entre as camadas.
 
-A Árvore de Decisão foi utilizada para classificar a ação do rover com base nos dados dos sensores.
+### 4.3. Regressão Linear complementar
 
-Esse modelo é importante para o contexto do projeto porque suas regras podem ser visualizadas e auditadas, o que facilita a interpretação da decisão em sistemas críticos.
+Aplicada à estimativa do consumo de energia (Wh), variável relevante para o planejamento de deslocamento e a gestão da autonomia da bateria.
 
-**Resultado obtido:**
+### 4.4. Visão Computacional (etapa opcional)
 
-- Acurácia no teste: **98,67%**
+Geração de uma imagem sintética de terreno planetário e aplicação do detector de bordas **Canny** (OpenCV), ilustrando como o processamento de imagens poderia complementar os sensores na percepção de obstáculos.
 
-### 2. Rede Neural Artificial MLP
+## 5. Resultados
 
-A MLP foi usada para resolver o mesmo problema de classificação. Esse modelo utiliza camadas de neurônios artificiais, pesos, bias e funções de ativação para aprender padrões nos dados.
+| Modelo | Acurácia (teste) | Interpretabilidade |
+|---|---|---|
+| Árvore de Decisão | 98,67% | Alta — regras visíveis e auditáveis |
+| Rede Neural MLP | 89,33% | Baixa — pesos internos |
 
-Antes do treinamento, as variáveis numéricas foram padronizadas com `StandardScaler`, pois redes neurais são sensíveis à escala dos dados.
+A Regressão Linear obteve MAE de 1,1495 Wh, RMSE de 1,4506 Wh e R² de 0,9692, indicando boa capacidade de estimativa sobre a base simulada.
 
-**Resultado obtido:**
+A validação com cenários inéditos (obstáculo próximo, bateria crítica, terreno inclinado, superaquecimento, perda de comunicação, entre outros) evidenciou que ambos os modelos falharam em situações críticas — notadamente na perda parcial de comunicação, em que divergiram da ação esperada. Esse achado reforça a principal conclusão metodológica do trabalho: a IA não deve constituir a única camada de decisão.
 
-- Acurácia no teste: **89,33%**
+## 6. Conclusão
 
-## Comparação entre os modelos
+A Árvore de Decisão destacou-se pela conjugação de desempenho e interpretabilidade, atributo essencial em sistemas críticos. A MLP demonstrou capacidade de aprendizado de padrões mais complexos, porém com menor transparência, exigindo validação mais rigorosa para aplicação real.
 
-A Árvore de Decisão apresentou melhor desempenho no conjunto de teste e maior facilidade de interpretação. A MLP também apresentou bom resultado, mas é menos transparente, pois suas decisões dependem de pesos internos distribuídos entre neurônios e camadas.
+Os resultados indicam que, em uma missão real, os modelos de IA devem ser combinados com **regras fixas de segurança**, validações redundantes e monitoramento contínuo, de modo a assegurar que condições extremas — bateria crítica, superaquecimento ou ausência de comunicação — resultem obrigatoriamente em ações seguras, independentemente da predição.
 
-No contexto de um rover autônomo, a interpretabilidade é importante porque permite entender por que uma decisão foi tomada, especialmente em situações críticas como obstáculo próximo, bateria baixa, superaquecimento ou perda de comunicação.
+## 7. Estrutura do repositório
 
-## Regressão Linear complementar
-
-A etapa de Regressão Linear foi utilizada para prever o consumo de energia do rover, uma variável numérica relevante para o planejamento da missão.
-
-**Resultados obtidos:**
-
-- MAE: **1,1495 Wh**
-- RMSE: **1,4506 Wh**
-- R²: **0,9692**
-
-Esses resultados indicam que o modelo conseguiu estimar o consumo de energia com baixo erro para a base simulada.
-
-## Testes com novos cenários
-
-Foram criados novos cenários para avaliar o comportamento dos modelos em situações diferentes, como:
-
-- obstáculo muito próximo;
-- bateria baixa;
-- terreno inclinado;
-- superaquecimento;
-- perda parcial de comunicação;
-- operação normal.
-
-A análise mostrou que os modelos apresentaram bom comportamento geral, mas também falharam em algumas situações críticas. No cenário de perda parcial de comunicação, por exemplo, ambos os modelos divergiram da regra esperada, o que reforça a necessidade de combinar IA com regras fixas de segurança em aplicações reais.
-
-## Visão Computacional
-
-Como etapa opcional, foi criada uma imagem sintética simulando um terreno planetário com obstáculos e linhas de relevo. Em seguida, foi aplicado o detector de bordas **Canny**, estudado na aula de Visão Computacional.
-
-Essa etapa mostra como imagens do ambiente poderiam complementar os sensores do rover, auxiliando na percepção de obstáculos e irregularidades do terreno.
-
-## Tecnologias utilizadas
-
-- Python
-- NumPy
-- Pandas
-- Matplotlib
-- Scikit-learn
-- OpenCV
-- Google Colab / Jupyter Notebook
-
-## Estrutura do repositório
-
-```text
+```
 RoverAI/
-├── RoverAI_Projeto_GS_IA.ipynb
-├── roverai_base_simulada_300registros.csv
+├── RoverAI_Projeto_GS_IA.ipynb   # Notebook principal
+├── RoverAI_base_simulada.csv     # Base de dados gerada pelo notebook
 └── README.md
 ```
 
-## Como executar
+## 8. Execução
 
-1. Abra o arquivo `RoverAI_Projeto_GS_IA.ipynb` no Google Colab ou Jupyter Notebook.
-2. Execute todas as células em ordem.
-3. No Google Colab, recomenda-se usar:
-   - `Runtime` → `Restart and run all`
-4. Verifique se todas as células foram executadas e se os outputs, gráficos e tabelas aparecem corretamente.
+1. Abrir `RoverAI_Projeto_GS_IA.ipynb` no Google Colab ou Jupyter Notebook.
+2. Executar todas as células em ordem.
+3. Conferir os outputs, gráficos e tabelas gerados.
 
-## Conclusão
+## 9. Autores
 
-O projeto RoverAI demonstrou como técnicas de Inteligência Artificial podem apoiar a tomada de decisão de um rover planetário. A Árvore de Decisão se destacou pela interpretabilidade e pelo desempenho, enquanto a MLP mostrou capacidade de aprender padrões da base simulada, mas com menor transparência.
-
-A análise dos cenários críticos mostrou que, em uma missão real, a IA não deveria ser a única camada de decisão. O sistema deveria ser combinado com regras fixas de segurança, validações redundantes e monitoramento constante para garantir que situações extremas resultem em ações seguras, como `retornar_base` ou `modo_seguro`.
+| Nome | RM |
+|---|---|
+| Ana Julia Vecchi | 563661 |
+| Gabriel Yuji| 563581 |
+| Marcella Fernandes | 570768 |
